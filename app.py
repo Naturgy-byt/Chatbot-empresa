@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify
+
+    from flask import Flask, request, jsonify
 from flask_cors import CORS
-CORS(app)
 
 app = Flask(__name__)
+CORS(app)
 
 # Armazena o estado da conversa por usuário (simples, baseado no IP)
 conversas = {}
@@ -13,7 +14,11 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    user_input = request.json["message"].strip()
+    data = request.get_json()
+    if not data or "message" not in data:
+        return jsonify({"response": "Mensagem inválida."}), 400
+
+    user_input = data["message"].strip().lower()
     user_id = request.remote_addr
 
     if user_id not in conversas:
@@ -37,6 +42,67 @@ def chat():
         else:
             return jsonify({"response": "Desculpe, não entendi. Digite 1 para entrega ou 2 para retirada."})
 
+    elif etapa == "pedido":
+        conversas[user_id]["numero_pedido"] = user_input
+        conversas[user_id]["etapa"] = "peticao"
+        return jsonify({"response": "Pedido registrado. Agora, informe o número da petição."})
+
+    elif etapa == "peticao":
+        conversas[user_id]["numero_peticao"] = user_input
+        conversas[user_id]["etapa"] = "responsavel"
+        return jsonify({"response": "Petição registrada. Por favor, informe o nome do responsável."})
+
+    elif etapa == "retirada_local":
+        conversas[user_id]["local_retirada"] = user_input
+        conversas[user_id]["etapa"] = "responsavel"
+        return jsonify({"response": "Local registrado. Por favor, informe o nome do responsável."})
+
+    elif etapa == "responsavel":
+        conversas[user_id]["responsavel"] = user_input
+        conversas[user_id]["etapa"] = "data"
+        return jsonify({"response": "Responsável registrado. Informe a data desejada (ex: 25/11/2025)."})
+
+    elif etapa == "data":
+        conversas[user_id]["data"] = user_input
+        conversas[user_id]["etapa"] = "hora"
+        return jsonify({"response": "Data registrada. Agora, informe o horário desejado (ex: 14:30)."})
+
+    elif etapa == "hora":
+        conversas[user_id]["hora"] = user_input
+        conversas[user_id]["etapa"] = "material"
+        return jsonify({"response": "Horário registrado. Por fim, informe o tipo de material."})
+
+    elif etapa == "material":
+        conversas[user_id]["material"] = user_input
+        conversas[user_id]["etapa"] = "fim"
+
+        dados = conversas[user_id]
+        if "numero_pedido" in dados:
+            resumo = (
+                f"Entrega agendada com sucesso!\n"
+                f"Pedido: {dados['numero_pedido']}\n"
+                f"Petição: {dados['numero_peticao']}\n"
+            )
+        else:
+            resumo = (
+                f"Retirada agendada com sucesso!\n"
+                f"Local: {dados['local_retirada']}\n"
+            )
+
+        resumo += (
+            f"Responsável: {dados['responsavel']}\n"
+            f"Data: {dados['data']}\n"
+            f"Horário: {dados['hora']}\n"
+            f"Material: {dados['material']}"
+        )
+
+        return jsonify({"response": resumo})
+
+    else:
+        return jsonify({"response": "Obrigado! Se precisar de algo mais, envie uma nova mensagem."})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)   
     elif etapa == "pedido":
         conversas[user_id]["numero_pedido"] = user_input
         conversas[user_id]["etapa"] = "peticao"
